@@ -4,6 +4,8 @@
  */
 #include "config.h"
 
+#include "srvctl.hpp"
+
 #include <fmt/printf.h>
 #include <getopt.h>
 
@@ -17,14 +19,42 @@ enum class Command
     disable,
 };
 
-static void setState(const char* /*service*/, bool /*state*/)
+static void setState(sdbusplus::bus::bus& bus, const char* service, bool state)
 {
-    throw std::runtime_error("Not implemented yet");
+    auto it = srvctl::serviceDefinitions.find(service);
+    if (it == srvctl::serviceDefinitions.end())
+    {
+        throw std::runtime_error(
+            fmt::format("Service {} is invalid or unsupported", service));
+    }
+
+    fmt::print("Setting service {} to {}... ", service, state);
+    try
+    {
+        it->second.status(bus, true);
+        fmt::print("done\n");
+    }
+    catch (const std::exception&)
+    {
+        fmt::print("fail\n");
+        throw;
+    }
 }
 
-static void showList()
+static void showList(sdbusplus::bus::bus& bus)
 {
-    throw std::runtime_error("Not implemented yet");
+    for (const auto& [name, service] : srvctl::serviceDefinitions)
+    {
+        try
+        {
+            fmt::print(" {:8s} {:48s} {}\n", name, service.summary,
+                       service.status(bus));
+        }
+        catch (const sdbusplus::exception::SdBusError&)
+        {
+            fmt::print(" {:8s} {:48s} N/A\n", name, service.summary);
+        }
+    }
 }
 
 static void printUsage(const char* binaryPath)
@@ -51,6 +81,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     const struct option opts[] = {
         // clang-format off
         { "help",   no_argument,        0, 'h' },
+#ifdef REMOTE_HOST_SUPPORT
+        { "host",   required_argument,  0, 'H' },
+#endif
 
         { 0,        0,                  0,  0  }
         // clang-format on
@@ -58,13 +91,29 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     opterr = 0;
     int optVal;
-    while ((optVal = getopt_long(argc, argv, "h", opts, nullptr)) != -1)
+#ifdef REMOTE_HOST_SUPPORT
+    const char* hostname = nullptr;
+#endif
+
+    while ((optVal = getopt_long(argc, argv,
+                                 "h"
+#ifdef REMOTE_HOST_SUPPORT
+                                 "H:"
+#endif
+                                 ,
+                                 opts, nullptr)) != -1)
     {
         switch (optVal)
         {
             case 'h':
                 printUsage(argv[0]);
                 return EXIT_SUCCESS;
+
+#ifdef REMOTE_HOST_SUPPORT
+            case 'H':
+                hostname = optarg;
+                break;
+#endif
 
             default:
                 fmt::print(stderr, "ERROR: Invalid option: {}\n",
@@ -102,20 +151,31 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
         }
     }
 
+    auto bus = sdbusplus::bus::new_default();
+
+#ifdef REMOTE_HOST_SUPPORT
+    if (hostname)
+    {
+        sd_bus* b = nullptr;
+        sd_bus_open_system_remote(&b, hostname);
+        bus = sdbusplus::bus::bus(b, std::false_type());
+    }
+#endif
+
     try
     {
         switch (command)
         {
             case Command::enable:
-                setState(argv[optind + 1], true);
+                setState(bus, argv[optind + 1], true);
                 break;
 
             case Command::disable:
-                setState(argv[optind + 1], false);
+                setState(bus, argv[optind + 1], false);
                 break;
 
             default:
-                showList();
+                showList(bus);
                 break;
         }
     }
