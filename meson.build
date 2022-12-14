@@ -19,3 +19,11 @@ conf.set_quoted('PROJECT_VERSION', meson.project_version())
 
 configure_file(output: 'config.h', configuration: conf)
 
+executable('srvctl',
+  [
+    'src/srvctl/main.cpp',
+  ],
+  install: true,
+  # Hide the tool from unpreveleged users
+  install_dir: get_option('sbindir'),
+)
