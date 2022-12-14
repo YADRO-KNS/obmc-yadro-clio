@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+# meson build directories
+build*
+.cache
+.clang
+
+# gtags
+GPATH
+GRTAGS
+GTAGS
