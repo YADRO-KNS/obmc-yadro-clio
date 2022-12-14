@@ -4,41 +4,86 @@
  */
 #include "config.h"
 
+#include "srvctl.hpp"
+
 #include <fmt/printf.h>
 
 #include <CLI/CLI.hpp>
 
 #include <stdexcept>
 
-static void setState(const std::string& /*service*/, bool /*state*/)
+static void setState(sdbusplus::bus::bus& bus, const std::string& service,
+                     bool state)
 {
-    throw std::runtime_error("Not implemented yet");
+    auto it = srvctl::serviceDefinitions.find(service);
+    if (it == srvctl::serviceDefinitions.end())
+    {
+        throw std::runtime_error(
+            fmt::format("Service {} is invalid or unsupported", service));
+    }
+
+    const auto strState = state ? "started" : "stopped";
+    fmt::print("Setting service {} to {} state... ", service, strState);
+    try
+    {
+        it->second.setState(bus, state);
+        fmt::print("done\n");
+        fmt::print("The service will be {} in about 20 seconds.\n", strState);
+    }
+    catch (const std::exception&)
+    {
+        fmt::print("fail\n");
+        throw;
+    }
 }
 
-static void showList()
+static void showList(sdbusplus::bus::bus& bus)
 {
-    throw std::runtime_error("Not implemented yet");
+    static constexpr auto formatStr = " {:8s} {:48s} {}\n";
+    fmt::print(formatStr, "SERVICE", "DESCRIPTION", "STATE");
+    for (const auto& [name, service] : srvctl::serviceDefinitions)
+    {
+        try
+        {
+            fmt::print(formatStr, name, service.summary,
+                       service.getState(bus) ? "on" : "off");
+        }
+        catch (const sdbusplus::exception::SdBusError&)
+        {
+            fmt::print(formatStr, name, service.summary, "N/A");
+        }
+    }
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     CLI::App app("");
+    auto bus = sdbusplus::bus::new_default();
+
+#ifdef REMOTE_HOST_SUPPORT
+    app.add_option_function<std::string>(
+        "-H,--host", [&](const std::string& hostname) {
+            sd_bus* b = nullptr;
+            sd_bus_open_system_remote(&b, hostname.c_str());
+            bus = sdbusplus::bus::bus(b, std::false_type());
+        });
+#endif
 
     auto listCmd = app.add_subcommand(
         "list", "List available services and their actual state");
-    listCmd->callback(showList);
+    listCmd->callback([&]() { showList(bus); });
 
     std::string service;
 
     auto enableCmd =
         app.add_subcommand("enable", "Enable a particular service");
     enableCmd->add_option("SERVICE", service, "Service name")->required();
-    enableCmd->callback([&]() { setState(service, true); });
+    enableCmd->callback([&]() { setState(bus, service, true); });
 
     auto disableCmd =
         app.add_subcommand("disable", "Disable a particular service");
     disableCmd->add_option("SERVICE", service, "Service name")->required();
-    disableCmd->callback([&]() { setState(service, false); });
+    disableCmd->callback([&]() { setState(bus, service, false); });
 
     app.require_subcommand(1);
     try
