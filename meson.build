@@ -57,6 +57,7 @@ executable('srvctl',
   [
     'src/srvctl/main.cpp',
     'src/srvctl/srvctl.cpp',
+    'utils/confirm.cpp',
   ],
   dependencies: [
     cli11_dep,
