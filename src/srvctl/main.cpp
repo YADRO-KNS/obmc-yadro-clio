@@ -5,6 +5,7 @@
 #include "config.h"
 
 #include "srvctl.hpp"
+#include "utils/confirm.hpp"
 
 #include <fmt/printf.h>
 
@@ -13,7 +14,7 @@
 #include <stdexcept>
 
 static void setState(sdbusplus::bus::bus& bus, const std::string& service,
-                     bool state)
+                     bool state, bool interactive)
 {
     auto it = srvctl::serviceDefinitions.find(service);
     if (it == srvctl::serviceDefinitions.end())
@@ -23,6 +24,21 @@ static void setState(sdbusplus::bus::bus& bus, const std::string& service,
     }
 
     const auto strState = state ? "started" : "stopped";
+
+    if (interactive)
+    {
+        auto title = fmt::format("Service {} will be {}.", service, strState);
+        if (!state && it->first == "ssh")
+        {
+            title += "\nWARNING: You won't be able to log back in via SSH!";
+        }
+
+        if (!confirm(title.c_str()))
+        {
+            return;
+        }
+    }
+
     fmt::print("Setting service {} to {} state... ", service, strState);
     try
     {
@@ -74,16 +90,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     listCmd->callback([&]() { showList(bus); });
 
     std::string service;
+    bool yes = false;
 
     auto enableCmd =
         app.add_subcommand("enable", "Enable a particular service");
     enableCmd->add_option("SERVICE", service, "Service name")->required();
-    enableCmd->callback([&]() { setState(bus, service, true); });
+    enableCmd->add_flag("-y,--yes", yes, "Don't ask user for confirmation");
+    enableCmd->callback([&]() { setState(bus, service, true, !yes); });
 
     auto disableCmd =
         app.add_subcommand("disable", "Disable a particular service");
     disableCmd->add_option("SERVICE", service, "Service name")->required();
-    disableCmd->callback([&]() { setState(bus, service, false); });
+    disableCmd->add_flag("-y,--yes", yes, "Don't ask user for confirmation");
+    disableCmd->callback([&]() { setState(bus, service, false, !yes); });
 
     app.require_subcommand(1);
     try
