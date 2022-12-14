@@ -34,12 +34,28 @@ if not has_cli11
   cli11_dep = cli11_proj.get_variable('CLI11_dep')
 endif
 
+fmt_dep = dependency('fmt', required: false)
+if not fmt_dep.found()
+  fmt_opts = import('cmake').subproject_options()
+  fmt_opts.add_cmake_defines({
+    'CMAKE_POSITION_INDEPENDENT_CODE': 'ON',
+    'MASTER_PROJECT': 'OFF',
+  })
+  fmt_proj = import('cmake').subproject(
+    'fmt',
+    options: fmt_opts,
+    required: false)
+  assert(fmt_proj.found(), 'fmtlib is required')
+  fmt_dep = fmt_proj.dependency('fmt')
+endif
+
 executable('srvctl',
   [
     'src/srvctl/main.cpp',
   ],
   dependencies: [
     cli11_dep,
+    fmt_dep,
   ],
   install: true,
   # Hide the tool from unpreveleged users

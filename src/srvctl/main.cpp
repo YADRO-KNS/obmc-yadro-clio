@@ -4,9 +4,10 @@
  */
 #include "config.h"
 
+#include <fmt/printf.h>
+
 #include <CLI/CLI.hpp>
 
-#include <cstdio>
 #include <stdexcept>
 
 static void setState(const std::string& /*service*/, bool /*state*/)
@@ -46,7 +47,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch (const std::exception& e)
     {
-        fprintf(stderr, "ERROR: %s\n", e.what());
+        fmt::print(stderr, "ERROR: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
