@@ -28,6 +28,7 @@ executable('srvctl',
   [
     'src/srvctl/main.cpp',
     'src/srvctl/srvctl.cpp',
+    'utils/confirm.cpp',
   ],
   dependencies: [
     fmt_dep,

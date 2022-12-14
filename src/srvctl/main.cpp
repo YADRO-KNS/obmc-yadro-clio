@@ -5,6 +5,7 @@
 #include "config.h"
 
 #include "srvctl.hpp"
+#include "utils/confirm.hpp"
 
 #include <fmt/printf.h>
 #include <getopt.h>
@@ -19,13 +20,24 @@ enum class Command
     disable,
 };
 
-static void setState(sdbusplus::bus::bus& bus, const char* service, bool state)
+static void setState(sdbusplus::bus::bus& bus, const char* service, bool state,
+                     bool interactive)
 {
     auto it = srvctl::serviceDefinitions.find(service);
     if (it == srvctl::serviceDefinitions.end())
     {
         throw std::runtime_error(
             fmt::format("Service {} is invalid or unsupported", service));
+    }
+
+    if (interactive)
+    {
+        auto title = fmt::format("Serive {} will be {}.", service,
+                                 state ? "started" : "stopped");
+        if (!confirm(title.c_str()))
+        {
+            return;
+        }
     }
 
     fmt::print("Setting service {} to {}... ", service, state);
@@ -65,6 +77,7 @@ Usage: {} [OPTIONS] [COMMANDS [ARGS]]
 
 OPTIONS:
  -h, --help         show this help message and exit
+ -y, --yes          don't ask user for confirmation
 
 COMMANDS:
  list               show list of managing services and their actual state
@@ -81,6 +94,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     const struct option opts[] = {
         // clang-format off
         { "help",   no_argument,        0, 'h' },
+        { "yes",    no_argument,        0, 'y' },
 #ifdef REMOTE_HOST_SUPPORT
         { "host",   required_argument,  0, 'H' },
 #endif
@@ -94,9 +108,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 #ifdef REMOTE_HOST_SUPPORT
     const char* hostname = nullptr;
 #endif
+    bool interactive = true;
 
     while ((optVal = getopt_long(argc, argv,
-                                 "h"
+                                 "hy"
 #ifdef REMOTE_HOST_SUPPORT
                                  "H:"
 #endif
@@ -108,6 +123,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
             case 'h':
                 printUsage(argv[0]);
                 return EXIT_SUCCESS;
+
+            case 'y':
+                interactive = false;
+                break;
 
 #ifdef REMOTE_HOST_SUPPORT
             case 'H':
@@ -167,11 +186,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
         switch (command)
         {
             case Command::enable:
-                setState(bus, argv[optind + 1], true);
+                setState(bus, argv[optind + 1], true, interactive);
                 break;
 
             case Command::disable:
-                setState(bus, argv[optind + 1], false);
+                setState(bus, argv[optind + 1], false, interactive);
                 break;
 
             default:
