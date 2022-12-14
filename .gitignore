@@ -35,6 +35,8 @@
 build*
 .cache
 .clang
+subprojects/*
+!subprojects/*.wrap
 
 # gtags
 GPATH
