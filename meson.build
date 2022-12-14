@@ -19,9 +19,14 @@ conf.set_quoted('PROJECT_VERSION', meson.project_version())
 
 configure_file(output: 'config.h', configuration: conf)
 
+fmt_dep = dependency('fmt')
+
 executable('srvctl',
   [
     'src/srvctl/main.cpp',
+  ],
+  dependencies: [
+    fmt_dep,
   ],
   install: true,
   # Hide the tool from unpreveleged users

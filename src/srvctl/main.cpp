@@ -4,10 +4,9 @@
  */
 #include "config.h"
 
+#include <fmt/printf.h>
 #include <getopt.h>
 
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 
@@ -31,8 +30,8 @@ static void showList()
 static void printUsage(const char* binaryPath)
 {
     const char* app = basename(binaryPath);
-    printf(R"(
-Usage: %s [OPTIONS] [COMMANDS [ARGS]]
+    fmt::print(R"(
+Usage: {} [OPTIONS] [COMMANDS [ARGS]]
 
 OPTIONS:
  -h, --help         show this help message and exit
@@ -42,12 +41,12 @@ COMMANDS:
  enable SERVICE     enable and start specified service
  disable SERVICE    disable and stop specified service
 )",
-           app);
+               app);
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
-    printf("YADRO OpenBMC Service manager version %s\n", PROJECT_VERSION);
+    fmt::print("YADRO OpenBMC Service manager version {}\n", PROJECT_VERSION);
 
     const struct option opts[] = {
         // clang-format off
@@ -68,8 +67,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
                 return EXIT_SUCCESS;
 
             default:
-                fprintf(stderr, "ERROR: Invalid option: %s\n",
-                        argv[optind - 1]);
+                fmt::print(stderr, "ERROR: Invalid option: {}\n",
+                           argv[optind - 1]);
                 printUsage(argv[0]);
                 return EXIT_FAILURE;
         }
@@ -89,7 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
         }
         else if (0 != strcasecmp(argv[optind], "list"))
         {
-            fprintf(stderr, "ERROR: %s is invalid command\n", argv[optind]);
+            fmt::print(stderr, "ERROR: {} is invalid command\n", argv[optind]);
             printUsage(argv[0]);
             return EXIT_FAILURE;
         }
@@ -97,7 +96,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
         if ((command == Command::enable || command == Command::disable) &&
             (optind + 1 >= argc))
         {
-            fprintf(stderr, "ERROR: Service name required\n");
+            fmt::print(stderr, "ERROR: Service name required\n");
             printUsage(argv[0]);
             return EXIT_FAILURE;
         }
@@ -122,7 +121,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch (const std::exception& e)
     {
-        fprintf(stderr, "ERROR: %s\n", e.what());
+        fmt::print(stderr, "ERROR: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
