@@ -16,6 +16,55 @@ project('obmc-yadro-clio', 'cpp',
 conf = configuration_data()
 conf.set_quoted('PROJECT_VERSION', meson.project_version())
 # Place additional config options here
+conf.set('REMOTE_HOST_SUPPORT', get_option('remote-host-support').enabled())
+conf.set('WITH_ETH1', get_option('with-eth1').enabled())
 
 configure_file(output: 'config.h', configuration: conf)
 
+# CLI11 might not have a pkg-config. It is header only so just make
+# sure we can access the needed symbols from the header.
+cli11_dep = dependency('CLI11', required: false)
+has_cli11 = meson.get_compiler('cpp').has_header_symbol(
+  'CLI/CLI.hpp',
+  'CLI::App',
+  dependencies: cli11_dep,
+  required: false,
+)
+if not has_cli11
+  cli11_proj = subproject('cli11', required: false)
+  assert(cli11_proj.found(), 'CLI11 is required')
+  cli11_dep = cli11_proj.get_variable('CLI11_dep')
+endif
+
+fmt_dep = dependency('fmt', required: false)
+if not fmt_dep.found()
+  fmt_opts = import('cmake').subproject_options()
+  fmt_opts.add_cmake_defines({
+    'CMAKE_POSITION_INDEPENDENT_CODE': 'ON',
+    'MASTER_PROJECT': 'OFF',
+  })
+  fmt_proj = import('cmake').subproject(
+    'fmt',
+    options: fmt_opts,
+    required: false)
+  assert(fmt_proj.found(), 'fmtlib is required')
+  fmt_dep = fmt_proj.dependency('fmt')
+endif
+
+sdbusplus_dep = dependency('sdbusplus', fallback: ['sdbusplus', 'sdbusplus_dep'])
+
+executable('srvctl',
+  [
+    'src/srvctl/main.cpp',
+    'src/srvctl/srvctl.cpp',
+    'utils/confirm.cpp',
+  ],
+  dependencies: [
+    cli11_dep,
+    fmt_dep,
+    sdbusplus_dep,
+  ],
+  install: true,
+  # Hide the tool from unpreveleged users
+  install_dir: get_option('sbindir'),
+)

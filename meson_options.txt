@@ -1,0 +1,6 @@
+# Useful for degug
+option('remote-host-support', type: 'feature', value: 'disabled',
+       description: 'Enable support for remote host querying')
+
+option('with-eth1', type: 'feature', value: 'enabled',
+       description: 'Support for second ethernet interface')
